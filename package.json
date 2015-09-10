@@ -3,6 +3,7 @@
   "name": "pebble-fctx-compiler",
   "description": "Compiles SVG resources into a binary format for the Pebble fctx library.",
   "version": "1.0.0",
+  "license": "MIT",
   "repository": {
     "url": "https://github.com/jrmobley/pebble-fctx-compiler.git"
   },
