@@ -4,6 +4,12 @@ Compiles SVN files into a binary format for use with the pebble-fctx drawing lib
 
 Currently supports only the extraction of SVN font definitions.
 
+[FontForge](https://fontforge.github.io/en-US/) is recommended for preparing
+SVG fonts.
+
+In the `tools/fctx-compiler` directory, run `npm update` to install the local node
+package dependencies.
+
 A single SVG input file can generate multiple output files.  Each supported resource in the input is written as an output file into the resources directory.  Each output file is named with the id of the element from the input.
 
 For example, the input file `fonts.svg` contains two font elements, one with `id="script-digits"` and the other with `id="letters-sans"`.  The fctx-compiler package has been added under the `tools/fctx-compiler` directory.  Run the following command:

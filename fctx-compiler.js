@@ -18,14 +18,13 @@ if (argv._.length !== 1) {
     console.log('Usage: svg-compiler <input>');
     return;
 }
-var filename = argv._[0], // '../../resources/JRMdigits.svg',
-    output = argv._[1]; // '../../resources/JRMdigits.ffont';
+var filename = argv._[0],
+    output = argv._[1];
 
 require('colors');
 
 console.log('\nSVG compiler for pebble-fctx'.bold.blue);
 console.log('----------------------------\n'.bold.blue);
-//console.log(JSON.stringify(process.argv));
 
 fs.readFile(filename, function (err, data) {
     'use strict';
@@ -108,13 +107,13 @@ function packPathData(glyph, index, glyphs) {
     /*jshint validthis: true */
     'use strict';
     var metadata = this,
-        data = glyph.$.d,
+        data = glyph.$.d || '',
         commands = pathParser(data),
         cursor = { emScale: metadata.emScale, x: 0, y: 0, x0: 0, y0: 0 },
         packedCommands,
         packedPath;
 
-    console.log('"%s"  d="%s"', glyph.$.unicode, data);
+    //console.log('"%s"  d="%s"', glyph.$.unicode, data);
     packedCommands = commands.map(packPathCommand, cursor);
     packedPath = Buffer.concat(packedCommands);
 
@@ -219,7 +218,7 @@ function packObject(obj, format, keys) {
         return offset + size;
     }, 0);
 
-    console.log(debug);
+    //console.log(debug);
     return buffer;
 }
 
