@@ -41,6 +41,16 @@ fs.readFile(filename, function (err, data) {
     parser.parseString(data, function (err, result) {
         var defs = result.svg.defs[0];
 
+        _.each(defs.path, function (path) {
+            console.log('path id %s', path.$.id);
+            var packedPath = packPath(path),
+                output = 'resources/' + path.$.id + '.fpath';
+            fs.writeFile(output, packedPath, function (err) {
+                if (err) throw err;
+                console.log('Wrote %d bytes to %s', packedPath.length, output);
+            });
+        });
+
         _.each(defs.font, function (font) {
             console.log('font id %s', font.$.id);
             var packedFont = packFont(font),
@@ -53,6 +63,21 @@ fs.readFile(filename, function (err, data) {
 
     });
 });
+
+function packPath(path) {
+    /*jshint validthis: true */
+    'use strict';
+    var data = path.$.d || '',
+        commands = pathParser(data),
+        cursor = { emScale: 1, x: 0, y: 0, x0: 0, y0: 0 },
+        packedCommands,
+        packedPath;
+
+    packedCommands = commands.map(packPathCommand, cursor);
+    packedPath = Buffer.concat(packedCommands);
+
+    return packedPath;
+}
 
 function packFont(font) {
     'use strict';
