@@ -5,7 +5,8 @@
 */
 /*global
     require: false,
-    console: false
+    console: false,
+    process: false
 */
 
 var _ = require('underscore'),
@@ -16,7 +17,7 @@ var _ = require('underscore'),
 
 if (argv._.length !== 1) {
     console.log('Usage: svg-compiler <input>');
-    return;
+    process.exit(1);
 }
 var filename = argv._[0],
     output = argv._[1];
@@ -30,7 +31,7 @@ fs.readFile(filename, function (err, data) {
     'use strict';
     if (err) {
         console.log('failed to read %s because %s', filename, err);
-        process.exit();
+        process.exit(1);
     }
     var parser = new xml2js.Parser({
         explicitArray: true,
@@ -60,7 +61,7 @@ fs.readFile(filename, function (err, data) {
                 console.log('Wrote %d bytes to %s', packedFont.length, output);
             });
         });
-
+        
     });
 });
 
@@ -85,12 +86,20 @@ function packFont(font) {
         glyphElements = font.glyph,
         unicodeRangePattern = /U\+([A-Fa-f0-9]+)-([A-Fa-f0-9]+)/,
         unicodeRange = unicodeRangePattern.exec(metadata['unicode-range']),
+        unicodeRangeBegin = parseInt(unicodeRange[1], 16),
+        unicodeRangeEnd = parseInt(unicodeRange[2], 16) + 1,
         packedFontHeader,
+        glyphCount,
+        glyphTable = [],
+        glyphIndex = [],
+        entryPointBegin = 0,
+        entryPointEnd = 0,
         packedGlyphTable,
-        packedPaths,
+        packedGlyphIndex,
         pathDataSize,
         packedPathData,
-        packedFont;
+        packedFont,
+        errorCount = 0;
 
     if (metadata['units-per-em'] > 72) {
         metadata.emScale = 72 / metadata['units-per-em'];
@@ -98,37 +107,146 @@ function packFont(font) {
         metadata.emScale = 1;
     }
 
-    metadata.unicodeOffset = parseInt(unicodeRange[1], 16);
-    metadata.glyphCount = parseInt(unicodeRange[2], 16) + 1 - metadata.unicodeOffset;
-    packedFontHeader = packObject.call(metadata, metadata, 'UUFFF', ['glyphCount', 'unicodeOffset', 'units-per-em', 'ascent', 'descent']);
+    /* Build the glyphTable.  This will be a *sparse* array of glyph objects,
+       indexed by unicode entry points.  While we're at it, count the glyphs. */ 
+    glyphCount = glyphElements.reduce(function (count, glyphElement) {
+        var horizAdvX = Number.parseInt(glyphElement.$['horiz-adv-x'] || font.$['horiz-adv-x'], 10),
+            entryPoint = entryPointForGlyph(glyphElement),
+            paddedEntryPoint = entryPoint && padNumber(entryPoint, 16, 4, '0'),
+            unicodeString = padString(glyphElement.$['unicode'] || '', 3, ' '),
+            glyphName = glyphElement.$['glyph-name'],
+            glyph = {};
 
-    packedPaths = glyphElements.map(packPathData, metadata);
-    packedGlyphTable = new Buffer(6 * metadata.glyphCount);
-    packedGlyphTable.fill(0);
-    pathDataSize = glyphElements.reduce(function (offset, glyph, index) {
-        var horizAdv = glyph.$['horiz-adv-x'] || font.$['horiz-adv-x'],
-            unicode = glyph.$.unicode,
-            charCode = unicode.charCodeAt(0),
-            glyphIndex = charCode - metadata.unicodeOffset,
-            pathData = packedPaths[index];
+        if (!entryPoint) {
+            console.log('(%s) cannot determine entry point, discarded'.yellow, glyphName);
+            return count;
+        }
+            
+        if (entryPoint < unicodeRangeBegin || entryPoint >= unicodeRangeEnd) {
+            console.log('U+%s %s (%s) out of range, discarded'.yellow,  paddedEntryPoint, unicodeString, glyphName);
+            return count;
+        }
 
-        console.log('glyph[%d] "%s" |%d| : %d + %d', glyphIndex, unicode, horizAdv, offset, pathData.length);
-        packedGlyphTable.writeUIntLE(offset, 6 * glyphIndex, 2);
-        packedGlyphTable.writeUIntLE(pathData.length, 6 * glyphIndex + 2, 2);
-        horizAdv = Math.floor(horizAdv * metadata.emScale * 16 + 0.5);
-        packedGlyphTable.writeUIntLE(horizAdv, 6 * glyphIndex + 4, 2);
-        return offset + pathData.length;
+        glyph.horizAdvX = Math.floor(horizAdvX * metadata.emScale * 16 + 0.5);
+        try {
+            glyph.pathData = packPathData.call(metadata, glyphElement);
+        } catch (e) {
+            console.error('U+%s %s (%s) error packing path data'.red, paddedEntryPoint, unicodeString, glyphName);
+            glyph.pathData = new Buffer(0);
+            ++errorCount;
+        }
+        glyphTable[entryPoint] = glyph;
+        console.log('U+%s %s (%s)  %d bytes', paddedEntryPoint, unicodeString, glyphName, glyph.pathData.length);
+        return count + 1;
     }, 0);
 
-    console.log('packed path data size %d bytes', pathDataSize);
-    packedPathData = Buffer.concat(packedPaths, pathDataSize);
+    /* Build the glyphIndex.  While we're at it, calculate the total size of the
+       path data. */ 
+    pathDataSize = glyphTable.reduce(function (offset, glyph, entryPoint) {
+        
+        /* If any entry points have been skipped.  Write the current range to
+           the index and start a new range at this entry point. */
+        if (entryPoint > entryPointEnd) {
+            if (entryPointBegin < entryPointEnd) {
+                glyphIndex.push({ begin: entryPointBegin, end: entryPointEnd });
+            }
+            entryPointBegin = entryPoint;
+        }
+        entryPointEnd = entryPoint + 1;
+        
+        /* Record the curent path data offset and increment to total. */
+        glyph.pathDataOffset = offset;
+        return offset + glyph.pathData.length;
+    }, 0);
+    glyphIndex.push({ begin: entryPointBegin, end: entryPointEnd });
 
-    packedFont = Buffer.concat([packedFontHeader, packedGlyphTable, packedPathData]);
-    console.log('packed font total size %d bytes', packedFont.length);
+    console.log('\nunicode range index:')
+    glyphIndex.forEach(function (entry) {
+        console.log('\tU+%s-%s', padNumber(entry.begin, 16, 4, '0'), padNumber(entry.end - 1, 16, 4, '0'));
+    })
+
+    /* At this point, we are done using the glyphTable in sparse format and it
+       would really be easier to work with in condensed format. */
+    glyphTable = glyphTable.filter(function (value) { return value != undefined; })
+
+    /* Pack all of the path data into a single buffer. */
+    packedPathData = Buffer.concat(glyphTable.map(function (glyph) { return glyph.pathData; }), pathDataSize);
+
+    /* Pack the glyph table. */
+    packedGlyphTable = new Buffer(6 * glyphCount);
+    glyphTable.reduce(function (offset, glyph, index) {
+        var horizAdvX = Math.floor(glyph.horizAdvX * metadata.emScale * 16 + 0.5);
+        packedGlyphTable.writeUIntLE(glyph.pathDataOffset,  offset + 0, 2);
+        packedGlyphTable.writeUIntLE(glyph.pathData.length, offset + 2, 2);
+        packedGlyphTable.writeUIntLE(horizAdvX,             offset + 4, 2);
+        return offset + 6;
+    }, 0);
+
+    /* Pack the glyph index. */
+    packedGlyphIndex = new Buffer(4 * glyphIndex.length);
+    glyphIndex.forEach(function (entry, index) {
+        packedGlyphIndex.writeUIntLE(entry.begin, 4 * index + 0, 2);
+        packedGlyphIndex.writeUIntLE(entry.end,   4 * index + 2, 2);
+    });
+        
+    /* Pack the font header. */
+    metadata['glyph-index-length'] = glyphIndex.length;
+    metadata['glyph-table-length'] = glyphTable.length;
+    packedFontHeader = packObject.call(metadata, metadata, 'FFFUU', [ 'units-per-em', 'ascent', 'descent', 'glyph-index-length', 'glyph-table-length' ]);
+
+    /* Pack up the entire font. */
+    packedFont = Buffer.concat([packedFontHeader, packedGlyphIndex, packedGlyphTable, packedPathData]);
+
+    console.log('font header : %d bytes', packedFontHeader.length);
+    console.log('     index  : %d bytes', packedGlyphIndex.length);
+    console.log('     table  : %d bytes', packedGlyphTable.length);
+    console.log('     paths  : %d bytes', packedPathData.length);
+    console.log('total size  : %d bytes', packedFont.length);
+    if (errorCount > 0) {
+        console.error('WARNING - %d errors encountered.  See above.'.red, errorCount);
+    }
     return packedFont;
 }
 
-function packPathData(glyph, index, glyphs) {
+function padNumber(num, radix, width, padChar) {
+    return padString(num.toString(radix).toUpperCase(), width, padChar);
+}
+
+function padString(str, width, padChar) {
+    var pad = width - str.length + 1;
+    return Array(+(pad > 0 && pad)).join(padChar) + str;
+}
+
+var multiCharUnicodeAttrs = {
+    'fi': 0xFB01, 'fl': 0xFB02
+};
+
+/**
+ * Determine the unicode entry point for glyph.  The 'unicode' string attribute
+ * is checked against a lookup table of known ligature sequences and that entry
+ * point is used if found.  Otherwise, if the 'unicode' attribute is a single
+ * character, then that character code is used.  In all other cases (such as
+ * a missing 'unicode' attribute or finding an unrecognized ligature string)
+ * the return value is undefined (which is falsy).
+ */
+function entryPointForGlyph(glyph) {
+    var unicode = glyph.$.unicode;
+    if (unicode) {
+        if (multiCharUnicodeAttrs.hasOwnProperty(unicode)) {
+            return multiCharUnicodeAttrs[unicode];
+        } else if (unicode.length === 1) {
+            return unicode.charCodeAt(0);
+        }
+    }
+}
+
+/**
+ * Encodes the path data found in the 'd' attribute of a <glyph> element.
+ * @param glyph  A single parsed glyph tag from the SVG.
+ * @return a Buffer containing the encoded data.  If the glyph does not have
+ *           any path data, the Buffer will be empty.
+ */
+function packPathData(glyph) {
     /*jshint validthis: true */
     'use strict';
     var metadata = this,
