@@ -61,7 +61,7 @@ fs.readFile(filename, function (err, data) {
                 console.log('Wrote %d bytes to %s', packedFont.length, output);
             });
         });
-        
+
     });
 });
 
@@ -108,12 +108,12 @@ function packFont(font) {
     }
 
     /* Build the glyphTable.  This will be a *sparse* array of glyph objects,
-       indexed by unicode entry points.  While we're at it, count the glyphs. */ 
+       indexed by unicode entry points.  While we're at it, count the glyphs. */
     glyphCount = glyphElements.reduce(function (count, glyphElement) {
         var horizAdvX = Number.parseInt(glyphElement.$['horiz-adv-x'] || font.$['horiz-adv-x'], 10),
             entryPoint = entryPointForGlyph(glyphElement),
             paddedEntryPoint = entryPoint && padNumber(entryPoint, 16, 4, '0'),
-            unicodeString = padString(glyphElement.$['unicode'] || '', 3, ' '),
+            unicodeString = padString(glyphElement.unicode || '', 3, ' '),
             glyphName = glyphElement.$['glyph-name'],
             glyph = {};
 
@@ -121,7 +121,7 @@ function packFont(font) {
             console.log('(%s) cannot determine entry point, discarded'.yellow, glyphName);
             return count;
         }
-            
+
         if (entryPoint < unicodeRangeBegin || entryPoint >= unicodeRangeEnd) {
             console.log('U+%s %s (%s) out of range, discarded'.yellow,  paddedEntryPoint, unicodeString, glyphName);
             return count;
@@ -141,9 +141,9 @@ function packFont(font) {
     }, 0);
 
     /* Build the glyphIndex.  While we're at it, calculate the total size of the
-       path data. */ 
+       path data. */
     pathDataSize = glyphTable.reduce(function (offset, glyph, entryPoint) {
-        
+
         /* If any entry points have been skipped.  Write the current range to
            the index and start a new range at this entry point. */
         if (entryPoint > entryPointEnd) {
@@ -153,21 +153,21 @@ function packFont(font) {
             entryPointBegin = entryPoint;
         }
         entryPointEnd = entryPoint + 1;
-        
+
         /* Record the curent path data offset and increment to total. */
         glyph.pathDataOffset = offset;
         return offset + glyph.pathData.length;
     }, 0);
     glyphIndex.push({ begin: entryPointBegin, end: entryPointEnd });
 
-    console.log('\nunicode range index:')
+    console.log('\nunicode range index:');
     glyphIndex.forEach(function (entry) {
         console.log('\tU+%s-%s', padNumber(entry.begin, 16, 4, '0'), padNumber(entry.end - 1, 16, 4, '0'));
-    })
+    });
 
     /* At this point, we are done using the glyphTable in sparse format and it
        would really be easier to work with in condensed format. */
-    glyphTable = glyphTable.filter(function (value) { return value != undefined; })
+    glyphTable = glyphTable.filter(function (value) { return value !== undefined; });
 
     /* Pack all of the path data into a single buffer. */
     packedPathData = Buffer.concat(glyphTable.map(function (glyph) { return glyph.pathData; }), pathDataSize);
@@ -188,7 +188,7 @@ function packFont(font) {
         packedGlyphIndex.writeUIntLE(entry.begin, 4 * index + 0, 2);
         packedGlyphIndex.writeUIntLE(entry.end,   4 * index + 2, 2);
     });
-        
+
     /* Pack the font header. */
     metadata['glyph-index-length'] = glyphIndex.length;
     metadata['glyph-table-length'] = glyphTable.length;
