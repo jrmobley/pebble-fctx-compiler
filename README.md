@@ -1,8 +1,8 @@
 # fctx-compiler
 
-Compiles SVN files into a binary format for use with the pebble-fctx drawing library.
+Compiles SVG files into a binary format for use with the pebble-fctx drawing library.
 
-Supports the extraction of SVN font definitions and individual paths.
+Supports the extraction of SVG font definitions and individual paths.
 
 [FontForge](https://fontforge.github.io/en-US/) is recommended for preparing
 SVG fonts.
