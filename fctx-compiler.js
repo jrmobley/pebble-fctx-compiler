@@ -113,7 +113,7 @@ function packFont(font) {
         var horizAdvX = Number.parseInt(glyphElement.$['horiz-adv-x'] || font.$['horiz-adv-x'], 10),
             entryPoint = entryPointForGlyph(glyphElement),
             paddedEntryPoint = entryPoint && padNumber(entryPoint, 16, 4, '0'),
-            unicodeString = padString(glyphElement.unicode || '', 3, ' '),
+            unicodeString = padString(glyphElement.$.unicode || '', 3, ' '),
             glyphName = glyphElement.$['glyph-name'],
             glyph = {};
 
