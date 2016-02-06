@@ -175,10 +175,9 @@ function packFont(font) {
     /* Pack the glyph table. */
     packedGlyphTable = new Buffer(6 * glyphCount);
     glyphTable.reduce(function (offset, glyph, index) {
-        var horizAdvX = Math.floor(glyph.horizAdvX * metadata.emScale * 16 + 0.5);
         packedGlyphTable.writeUIntLE(glyph.pathDataOffset,  offset + 0, 2);
         packedGlyphTable.writeUIntLE(glyph.pathData.length, offset + 2, 2);
-        packedGlyphTable.writeUIntLE(horizAdvX,             offset + 4, 2);
+        packedGlyphTable.writeUIntLE(glyph.horizAdvX,       offset + 4, 2);
         return offset + 6;
     }, 0);
 
