@@ -1,14 +1,16 @@
 {
   "author": "JR Mobley",
   "name": "pebble-fctx-compiler",
-  "description": "Compiles SVG resources into a binary format for the Pebble fctx library.",
+  "description": "Compiles SVG resources into a binary format for the pebble-fctx library.",
   "version": "1.0.0",
   "license": "MIT",
   "repository": {
     "url": "https://github.com/jrmobley/pebble-fctx-compiler.git"
   },
-  "main": "./fctx-compiler.js",
-  "keywords": [],
+  "bin": {
+      "fctx-compiler": "./fctx-compiler.js"
+  },
+  "keywords": ["pebble-package"],
   "dependencies": {
     "colors": "^1.1.0",
     "minimist": "^1.2.0",
