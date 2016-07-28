@@ -6,8 +6,7 @@ Compiles SVG files into a binary format for use with the pebble-fctx drawing lib
 
 Supports the extraction of SVG font definitions and individual paths.
 
-[FontForge](https://fontforge.github.io/en-US/) is recommended for preparing
-SVG fonts.
+[FontForge](https://fontforge.github.io/en-US/) is recommended for preparing SVG fonts.
 
 A single SVG input file can generate multiple output files.  Each supported resource in the input is written as an output file into the resources directory.  Each output file is named with the id of the element from the input.
 

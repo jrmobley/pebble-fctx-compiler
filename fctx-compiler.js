@@ -9,28 +9,63 @@
     process: false
 */
 
+require('colors');
 var _ = require('underscore'),
     fs = require('fs'),
     xml2js = require('xml2js'),
     pathParser = require('svg-path-parser'),
     argv = require('minimist')(process.argv.slice(2));
 
+console.log('\nSVG compiler for pebble-fctx'.bold.blue);
+console.log('----------------------------'.bold.blue);
+
+function arrayArg(arg) {
+    if (_.isArray(arg)) {
+        return arg;
+    }
+    if (_.isString(arg)) {
+        return [arg];
+    }
+    return [];
+}
+
+var groupDefs = {
+        'digits': /[0-9]/,
+        'ascii': /[A-Za-z]/,
+        'latin1': /[À-ÖØ-öø-ÿ]/
+    },
+    filename = argv._[0],
+    output = argv._[1],
+    groupArgs = arrayArg(argv.g),
+    regexArgs = arrayArg(argv.r),
+    patterns;
+
+patterns = _.map(groupArgs, function (g) {
+    if (groupDefs.hasOwnProperty(g)) {
+        console.log('include character group: ' + g + ' ' + groupDefs[g]);
+        return groupDefs[g];
+    }
+    console.log('   invalid character group: '.grey + g.bold.yellow);
+});
+
+_.forEach(regexArgs, function (regex) {
+    patterns.push(new RegExp(regex));
+});
+
+if (patterns.length === 0) patterns = [/./];
+console.log('patterns: ' + patterns);
+
 if (argv._.length !== 1) {
-    console.log('Usage: svg-compiler <input>');
+    console.log('Usage: fctx-compiler <input> [options]');
+    console.log('Options include:');
+    console.log('   -g group');
     process.exit(1);
 }
-var filename = argv._[0],
-    output = argv._[1];
-
-require('colors');
-
-console.log('\nSVG compiler for pebble-fctx'.bold.blue);
-console.log('----------------------------\n'.bold.blue);
 
 fs.readFile(filename, function (err, data) {
     'use strict';
     if (err) {
-        console.log('failed to read %s because %s', filename, err);
+        console.log('failed to read "%s" because: %s'.red, filename, err);
         process.exit(1);
     }
     var parser = new xml2js.Parser({
@@ -118,12 +153,20 @@ function packFont(font) {
             glyph = {};
 
         if (!entryPoint) {
-            console.log('(%s) cannot determine entry point, discarded'.yellow, glyphName);
+            console.log('(%s) cannot determine entry point, discarded'.grey, glyphName);
             return count;
         }
 
         if (entryPoint < unicodeRangeBegin || entryPoint >= unicodeRangeEnd) {
-            console.log('U+%s %s (%s) out of range, discarded'.yellow,  paddedEntryPoint, unicodeString, glyphName);
+            console.log('U+%s %s (%s) out of range, discarded'.grey,  paddedEntryPoint, unicodeString, glyphName);
+            return count;
+        }
+
+        var patternMatched = patterns.reduce(function (matched, pattern) {
+            return matched || pattern.test(String.fromCharCode(entryPoint));
+        }, false);
+        if (! patternMatched) {
+            console.log('U+%s %s (%s) not matched, discarded'.grey,  paddedEntryPoint, unicodeString, glyphName);
             return count;
         }
 
