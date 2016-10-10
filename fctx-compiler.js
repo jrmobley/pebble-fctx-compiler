@@ -234,7 +234,7 @@ function packFont(font) {
     /* Pack the font header. */
     metadata['glyph-index-length'] = glyphIndex.length;
     metadata['glyph-table-length'] = glyphTable.length;
-    packedFontHeader = packObject.call(metadata, metadata, 'FFFUU', [ 'units-per-em', 'ascent', 'descent', 'glyph-index-length', 'glyph-table-length' ]);
+    packedFontHeader = packObject.call(metadata, metadata, 'FFFFUU', [ 'units-per-em', 'ascent', 'descent', 'cap-height', 'glyph-index-length', 'glyph-table-length' ]);
 
     /* Pack up the entire font. */
     packedFont = Buffer.concat([packedFontHeader, packedGlyphIndex, packedGlyphTable, packedPathData]);

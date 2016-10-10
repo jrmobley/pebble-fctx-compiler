@@ -1,6 +1,13 @@
 # pebble-fctx-compiler
 
-Compiles SVG resources into a binary format for use with the pebble-fctx drawing library.
+Compiles SVG resources into a binary format for use with the [pebble-fctx](https://www.npmjs.com/package/pebble-fctx) drawing library.
+
+### Release notes
+
+##### v1.2
+* Added cap-height to the font metadata.  Compatible with [pebble-fctx](https://www.npmjs.com/package/pebble-fctx) version 1.6.
+
+### Installation and usage
 
 To install as a local `devDependency` within your pebble project:
 
