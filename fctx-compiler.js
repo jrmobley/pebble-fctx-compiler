@@ -29,24 +29,11 @@ function arrayArg(arg) {
     return [];
 }
 
-var groupDefs = {
-        'digits': /[0-9]/,
-        'ascii': /[A-Za-z]/,
-        'latin1': /[À-ÖØ-öø-ÿ]/
-    },
-    filename = argv._[0],
+var filename = argv._[0],
     output = argv._[1],
-    groupArgs = arrayArg(argv.g),
+    verbose = argv.v,
     regexArgs = arrayArg(argv.r),
-    patterns;
-
-patterns = _.map(groupArgs, function (g) {
-    if (groupDefs.hasOwnProperty(g)) {
-        console.log('include character group: ' + g + ' ' + groupDefs[g]);
-        return groupDefs[g];
-    }
-    console.log('   invalid character group: '.grey + g.bold.yellow);
-});
+    patterns = [];
 
 _.forEach(regexArgs, function (regex) {
     patterns.push(new RegExp(regex));
@@ -58,7 +45,8 @@ console.log('patterns: ' + patterns);
 if (argv._.length !== 1) {
     console.log('Usage: fctx-compiler <input> [options]');
     console.log('Options include:');
-    console.log('   -g group');
+    console.log('   -r regex');
+    console.log('   -v');
     process.exit(1);
 }
 
@@ -75,12 +63,19 @@ fs.readFile(filename, function (err, data) {
         ]
     });
     parser.parseString(data, function (err, result) {
-        var defs = result.svg.defs[0];
+        var defs = result.svg.defs[0],
+            resdir = 'resources';
+
+        if (fs.existsSync(resdir) && fs.statSync(resdir).isDirectory()) {
+            resdir = resdir + '/';
+        } else {
+            resdir = '';
+        }
 
         _.each(defs.path, function (path) {
             console.log('path id %s', path.$.id);
             var packedPath = packPath(path),
-                output = 'resources/' + path.$.id + '.fpath';
+                output = resdir + path.$.id + '.fpath';
             fs.writeFile(output, packedPath, function (err) {
                 if (err) throw err;
                 console.log('Wrote %d bytes to %s', packedPath.length, output);
@@ -90,11 +85,13 @@ fs.readFile(filename, function (err, data) {
         _.each(defs.font, function (font) {
             console.log('font id %s', font.$.id);
             var packedFont = packFont(font),
-                output = 'resources/' + font.$.id + '.ffont';
-            fs.writeFile(output, packedFont, function (err) {
-                if (err) throw err;
-                console.log('Wrote %d bytes to %s', packedFont.length, output);
-            });
+                output = resdir + font.$.id + '.ffont';
+            if (packedFont) {
+                fs.writeFile(output, packedFont, function (err) {
+                    if (err) throw err;
+                    console.log('Wrote %d bytes to %s', packedFont.length, output);
+                });
+            }
         });
 
     });
@@ -153,12 +150,16 @@ function packFont(font) {
             glyph = {};
 
         if (!entryPoint) {
-            console.log('(%s) cannot determine entry point, discarded'.grey, glyphName);
+            if (verbose) {
+                console.log('(%s) cannot determine entry point, discarded'.grey, glyphName);
+            }
             return count;
         }
 
         if (entryPoint < unicodeRangeBegin || entryPoint >= unicodeRangeEnd) {
-            console.log('U+%s %s (%s) out of range, discarded'.grey,  paddedEntryPoint, unicodeString, glyphName);
+            if (verbose) {
+                console.log('U+%s %s (%s) out of range, discarded'.grey,  paddedEntryPoint, unicodeString, glyphName);
+            }
             return count;
         }
 
@@ -166,7 +167,9 @@ function packFont(font) {
             return matched || pattern.test(String.fromCharCode(entryPoint));
         }, false);
         if (! patternMatched) {
-            console.log('U+%s %s (%s) not matched, discarded'.grey,  paddedEntryPoint, unicodeString, glyphName);
+            if (verbose) {
+                console.log('U+%s %s (%s) not matched, discarded'.grey,  paddedEntryPoint, unicodeString, glyphName);
+            }
             return count;
         }
 
@@ -202,6 +205,11 @@ function packFont(font) {
         return offset + glyph.pathData.length;
     }, 0);
     glyphIndex.push({ begin: entryPointBegin, end: entryPointEnd });
+
+    if (pathDataSize >= 65536) {
+        console.log(('\nFont data size (' + Math.floor(pathDataSize / 1024) + 'kb) exceeds 64kb.\nPlease select fewer glyphs or try simpler font.').bold.red);
+        return null;
+    }
 
     console.log('\nunicode range index:');
     glyphIndex.forEach(function (entry) {
