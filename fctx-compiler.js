@@ -117,7 +117,7 @@ function packFont(font) {
     var metadata = font['font-face'][0].$,
         glyphElements = font.glyph,
         unicodeRangePattern = /U\+([A-Fa-f0-9]+)-([A-Fa-f0-9]+)/,
-        unicodeRange = unicodeRangePattern.exec(metadata['unicode-range']),
+        unicodeRange = unicodeRangePattern.exec(metadata['unicode-range'] || "U+0-10FFFF"),
         unicodeRangeBegin = parseInt(unicodeRange[1], 16),
         unicodeRangeEnd = parseInt(unicodeRange[2], 16) + 1,
         packedFontHeader,
