@@ -4,6 +4,9 @@ Compiles SVG resources into a binary format for use with the [pebble-fctx](https
 
 ### Release notes
 
+##### v1.2.2
+* Fixed crash bug when unicode-range attribute is not present.  Fix c/o stefanheule
+
 ##### v1.2.1
 * Made output less verbose by default.
 * Added error handling for fonts that exceed 64kb in size.
