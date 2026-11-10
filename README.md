@@ -1,5 +1,7 @@
 # pebble-fctx-compiler
 
+Notice: this codebase will no longer be updated.
+
 Compiles SVG resources into a binary format for use with the [pebble-fctx](https://www.npmjs.com/package/pebble-fctx) drawing library.
 
 ### Release notes
